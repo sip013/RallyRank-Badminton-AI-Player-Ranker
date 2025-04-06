@@ -32,7 +32,7 @@ const Sidebar: React.FC = () => {
       <div className="p-6">
         <h1 className="text-2xl font-bold flex items-center">
           <img 
-            src="/favicon.svg" 
+            src="/RallyRank-Badminton-AI-Player-Ranker/favicon.svg" 
             alt="RallyRank Logo" 
             className="h-8 w-8 mr-2"
           />

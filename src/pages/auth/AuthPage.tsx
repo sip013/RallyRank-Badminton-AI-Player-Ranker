@@ -69,7 +69,7 @@ const AuthPage: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold flex items-center justify-center">
             <img 
-              src="/favicon.svg" 
+              src="/RallyRank-Badminton-AI-Player-Ranker/favicon.svg" 
               alt="RallyRank Logo" 
               className="h-8 w-8 mr-2"
             />
@@ -114,18 +114,21 @@ const AuthPage: React.FC = () => {
                 </CardContent>
                 <CardFooter>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Logging in...' : 'Login'}
+                    {loading ? 'Signing in...' : 'Sign In'}
                   </Button>
                 </CardFooter>
               </form>
             </TabsContent>
-            
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login" id="login-tab">Login</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
             <TabsContent value="signup">
               <form onSubmit={handleSignUp}>
                 <CardHeader>
-                  <CardTitle>Sign Up</CardTitle>
+                  <CardTitle>Create an Account</CardTitle>
                   <CardDescription>
-                    Create a new account to get started
+                    Enter your details to create a new account
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -145,26 +148,20 @@ const AuthPage: React.FC = () => {
                     <Input
                       id="signup-password"
                       type="password"
-                      placeholder="Create a password (min. 6 characters)"
+                      placeholder="Create a password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      minLength={6}
                     />
                   </div>
                 </CardContent>
                 <CardFooter>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Creating account...' : 'Create Account'}
+                    {loading ? 'Creating account...' : 'Sign Up'}
                   </Button>
                 </CardFooter>
               </form>
             </TabsContent>
-            
-            <TabsList className="grid w-full grid-cols-2 mt-4">
-              <TabsTrigger value="login" id="login-tab">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
           </Tabs>
         </Card>
       </div>
