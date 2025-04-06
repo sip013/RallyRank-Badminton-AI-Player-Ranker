@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,7 +20,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/RallyRank-Badminton-AI-Player-Ranker">
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             
