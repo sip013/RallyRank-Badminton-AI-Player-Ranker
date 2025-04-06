@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/rallyrank-ai-badminton-matchmaker-main/' : '/',
+  base: mode === 'production' ? '/RallyRank-Badminton-AI-Player-Ranker/' : '/',
   server: {
     host: "::",
     port: 3000,
