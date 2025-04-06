@@ -4,6 +4,7 @@ import { Home, Users, GitCompare, ClipboardList, BarChart3, LogOut, LogIn } from
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { resolvePath } from '@/utils/pathUtils';
 
 const Sidebar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -32,7 +33,7 @@ const Sidebar: React.FC = () => {
       <div className="p-6">
         <h1 className="text-2xl font-bold flex items-center">
           <img 
-            src="/RallyRank-Badminton-AI-Player-Ranker/favicon.svg" 
+            src={resolvePath('/favicon.svg')} 
             alt="RallyRank Logo" 
             className="h-8 w-8 mr-2"
           />

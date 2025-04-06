@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
+import { resolvePath } from '@/utils/pathUtils';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ const AuthPage: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold flex items-center justify-center">
             <img 
-              src="/RallyRank-Badminton-AI-Player-Ranker/favicon.svg" 
+              src={resolvePath('/favicon.svg')} 
               alt="RallyRank Logo" 
               className="h-8 w-8 mr-2"
             />
