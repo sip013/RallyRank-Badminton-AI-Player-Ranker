@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>RallyRank</title>
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages
+      // MIT License
+      // https://github.com/rafgraph/spa-github-pages
+      var pathSegmentsToKeep = 1;
+      var basePath = '/RallyRank-Badminton-AI-Player-Ranker/';
+
+      var l = window.location;
+      var redirect = l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        basePath + '/?/' +
+        l.pathname.slice(basePath.length + 1).replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash;
+      
+      window.location.replace(redirect);
+    </script>
+  </head>
+  <body>
+    <p>Redirecting to the main application...</p>
+  </body>
+</html> 
