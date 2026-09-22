@@ -59,7 +59,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: Build (GitHub Pages subpath)
         run: npm run build
         env:
           VITE_BASE_URL: "/RallyRank-Badminton-AI-Player-Ranker/"

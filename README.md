@@ -67,10 +67,29 @@ Google sign-in skips the email waiting page (identity is already verified).
 5. Optional: deploy edge function `supabase/functions/log-match` (thin wrapper around the RPC).
 6. Run: `npm run dev`
 
+## Deploy on Railway
+
+1. Push this repo to GitHub (Railway deploys from Git).
+2. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub** → select this repo.
+3. Root directory: repo root (where `package.json` / `railway.toml` live).
+4. **Variables** (required at build time):
+   - `VITE_SUPABASE_URL` = your Supabase project URL  
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_...`  
+   - `VITE_BASE_URL` = `/`
+5. Generate a public domain (Railway service → **Settings** → **Networking** → **Generate domain**).
+6. Supabase → **Authentication → URL Configuration**:
+   - **Site URL**: `https://YOUR-RAILWAY-DOMAIN`
+   - **Redirect URLs** add:
+     - `https://YOUR-RAILWAY-DOMAIN/auth/callback`
+     - `https://YOUR-RAILWAY-DOMAIN/auth/verify-email`
+
+`railway.toml` runs `npm ci && npm run build`, then `npm start` (static `serve` on `$PORT`).
+
 ## Scripts
 
 - `npm run dev` — local server
-- `npm run build` — production build
+- `npm run build` — production build (`VITE_BASE_URL` defaults to `/`)
+- `npm start` — serve `dist` (Railway / local preview after build)
 - `npm run lint` — ESLint
 - `npm run typecheck` — TypeScript
 
