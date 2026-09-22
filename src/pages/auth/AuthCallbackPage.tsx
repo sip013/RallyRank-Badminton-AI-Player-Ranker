@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { clearPendingAuth, isEmailConfirmed, pingAuthVerified } from '@/lib/authHelpers';
+import {
+  clearPendingAuth,
+  consumePostAuthRedirect,
+  isEmailConfirmed,
+  pingAuthVerified,
+  readPostAuthRedirect,
+  sanitizeAppPath,
+} from '@/lib/authHelpers';
 
 const AuthCallbackPage: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +18,19 @@ const AuthCallbackPage: React.FC = () => {
     let cancelled = false;
     let routed = false;
 
+    const resolveDestination = async () => {
+      const saved = readPostAuthRedirect();
+      if (saved) return consumePostAuthRedirect(saved);
+
+      const { data: memberships } = await supabase
+        .from('memberships')
+        .select('id')
+        .limit(1);
+
+      if (memberships && memberships.length > 0) return '/app';
+      return '/onboarding';
+    };
+
     const routeUser = async (user: {
       email_confirmed_at?: string | null;
       identities?: { provider: string }[];
@@ -19,25 +39,22 @@ const AuthCallbackPage: React.FC = () => {
       routed = true;
 
       if (!isEmailConfirmed(user)) {
-        navigate('/auth/verify-email', { replace: true });
+        const redirect = readPostAuthRedirect();
+        navigate(
+          redirect
+            ? `/auth/verify-email?redirect=${encodeURIComponent(redirect)}`
+            : '/auth/verify-email',
+          { replace: true }
+        );
         return;
       }
 
       pingAuthVerified();
       clearPendingAuth();
 
-      const { data: memberships } = await supabase
-        .from('memberships')
-        .select('id')
-        .limit(1);
-
+      const dest = sanitizeAppPath(await resolveDestination(), '/onboarding');
       if (cancelled) return;
-
-      if (memberships && memberships.length > 0) {
-        navigate('/app', { replace: true });
-      } else {
-        navigate('/onboarding', { replace: true });
-      }
+      navigate(dest, { replace: true });
     };
 
     const finish = async () => {
@@ -51,7 +68,6 @@ const AuthCallbackPage: React.FC = () => {
 
       const session = data.session;
       if (!session?.user) {
-        // Give the client a moment to parse URL hash/query tokens
         await new Promise((r) => setTimeout(r, 400));
         const retry = await supabase.auth.getSession();
         if (!retry.data.session?.user) {

@@ -8,6 +8,9 @@ import { toast } from 'sonner';
 
 const AccountPage: React.FC = () => {
   const { user } = useAuth();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -15,21 +18,34 @@ const AccountPage: React.FC = () => {
     if (!user) return;
     supabase
       .from('profiles')
-      .select('username')
+      .select('username, first_name, last_name, phone')
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.username) setUsername(data.username);
+        if (!data) return;
+        setUsername(data.username || '');
+        setFirstName(data.first_name || '');
+        setLastName(data.last_name || '');
+        setPhone(data.phone || '');
       });
   }, [user]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!firstName.trim() || !lastName.trim()) {
+      toast.error('First and last name are required');
+      return;
+    }
     setSaving(true);
+    const derived =
+      username.trim() || `${firstName.trim()} ${lastName.trim()}`.trim();
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
-      username: username.trim() || null,
+      username: derived,
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      phone: phone.trim() || null,
       updated_at: new Date().toISOString(),
     });
     setSaving(false);
@@ -45,12 +61,45 @@ const AccountPage: React.FC = () => {
       </div>
 
       <form onSubmit={save} className="surface-panel space-y-4 p-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="first-name">First name</Label>
+            <Input
+              id="first-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="h-11"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="last-name">Last name</Label>
+            <Input
+              id="last-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="h-11"
+              required
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-11"
+          />
+        </div>
         <div className="space-y-2">
           <Label htmlFor="username">Display name</Label>
           <Input
             id="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            placeholder="Defaults to first + last"
             className="h-11"
           />
         </div>

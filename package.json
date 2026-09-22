@@ -9,7 +9,10 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:remediation": "node scripts/check-remediation-invariants.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -77,6 +80,8 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
-    "vite": "^5.1.4"
+    "vite": "^5.1.4",
+    "vitest": "^3.0.5",
+    "jsdom": "^26.0.0"
   }
 }

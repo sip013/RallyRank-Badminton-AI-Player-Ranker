@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,8 +10,11 @@ type PublicLadder = {
     id: string;
     name: string;
     rating: number;
+    doubles_rating: number;
     matches_played: number;
+    doubles_matches_played?: number;
     wins: number;
+    doubles_wins?: number;
     win_rate: number | null;
     streak_count: number | null;
   }[];
@@ -32,6 +35,13 @@ const PublicLadderPage: React.FC = () => {
     },
   });
 
+  const players = useMemo(() => {
+    const list = data?.players || [];
+    return [...list].sort(
+      (a, b) => (b.doubles_rating ?? b.rating) - (a.doubles_rating ?? a.rating)
+    );
+  }, [data?.players]);
+
   return (
     <div className="court-lines min-h-screen">
       <header className="flex items-center justify-between px-6 py-5">
@@ -50,22 +60,31 @@ const PublicLadderPage: React.FC = () => {
           <>
             <p className="text-sm font-medium uppercase tracking-wide text-court">Public ladder</p>
             <h1 className="font-display text-3xl font-bold text-ink">{data.club.name}</h1>
-            <p className="mb-6 text-muted-foreground">Read-only Elo rankings</p>
+            <p className="mb-6 text-muted-foreground">Read-only doubles Elo rankings</p>
             <div className="surface-panel overflow-hidden">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 w-12">#</th>
                     <th className="px-4 py-3">Player</th>
-                    <th className="px-4 py-3">Rating</th>
+                    <th className="px-4 py-3">Doubles</th>
+                    <th className="hidden px-4 py-3 sm:table-cell">Singles</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {(data.players || []).map((p, i) => (
+                  {players.map((p, i) => (
                     <tr key={p.id}>
                       <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium">{p.name}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {p.name}
+                        <span className="mt-0.5 block text-xs text-muted-foreground sm:hidden">
+                          S {p.rating}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 font-display font-bold tabular-nums">
+                        {p.doubles_rating ?? p.rating}
+                      </td>
+                      <td className="hidden px-4 py-3 tabular-nums text-muted-foreground sm:table-cell">
                         {p.rating}
                       </td>
                     </tr>

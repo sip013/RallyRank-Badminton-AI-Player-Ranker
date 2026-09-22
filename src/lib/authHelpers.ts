@@ -1,9 +1,9 @@
 const PENDING_AUTH_KEY = 'rallyrank.pendingAuth';
+const POST_AUTH_REDIRECT_KEY = 'rallyrank.postAuthRedirect';
 const AUTH_VERIFIED_CHANNEL = 'rallyrank.auth-verified';
 
 export type PendingAuth = {
   email: string;
-  password: string;
 };
 
 export type AuthVerifiedPing = {
@@ -21,10 +21,49 @@ export function authCallbackUrl(): string {
   return `${getAuthRedirectBase()}/auth/callback`;
 }
 
-export function savePendingAuth(email: string, password: string) {
+/** Safe in-app path only (blocks open redirects). */
+export function sanitizeAppPath(path: string | null | undefined, fallback = '/onboarding'): string {
+  if (!path) return fallback;
+  const trimmed = path.trim();
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return fallback;
+  if (trimmed.startsWith('/auth')) return fallback;
+  return trimmed;
+}
+
+export function savePostAuthRedirect(path: string) {
+  const safe = sanitizeAppPath(path, '');
+  if (!safe) return;
+  try {
+    sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, safe);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readPostAuthRedirect(): string | null {
+  try {
+    const raw = sessionStorage.getItem(POST_AUTH_REDIRECT_KEY);
+    return raw ? sanitizeAppPath(raw, '') || null : null;
+  } catch {
+    return null;
+  }
+}
+
+export function consumePostAuthRedirect(fallback = '/onboarding'): string {
+  const path = readPostAuthRedirect() || fallback;
+  try {
+    sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+  } catch {
+    /* ignore */
+  }
+  return sanitizeAppPath(path, fallback);
+}
+
+/** Store email only — never persist password in sessionStorage. */
+export function savePendingAuth(email: string, _password?: string) {
   sessionStorage.setItem(
     PENDING_AUTH_KEY,
-    JSON.stringify({ email: email.trim(), password } satisfies PendingAuth)
+    JSON.stringify({ email: email.trim() } satisfies PendingAuth)
   );
 }
 
@@ -32,9 +71,9 @@ export function readPendingAuth(): PendingAuth | null {
   try {
     const raw = sessionStorage.getItem(PENDING_AUTH_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PendingAuth;
-    if (!parsed.email || !parsed.password) return null;
-    return parsed;
+    const parsed = JSON.parse(raw) as PendingAuth & { password?: string };
+    if (!parsed.email) return null;
+    return { email: parsed.email };
   } catch {
     return null;
   }

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,15 @@ import {
   authCallbackUrl,
   isEmailConfirmed,
   isEmailNotConfirmedError,
+  sanitizeAppPath,
   savePendingAuth,
+  savePostAuthRedirect,
 } from '@/lib/authHelpers';
 import { cn } from '@/lib/utils';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const { user, isLoading } = useAuth();
   const [tab, setTab] = useState(params.get('mode') === 'signup' ? 'signup' : 'login');
@@ -30,12 +33,26 @@ const AuthPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const redirectTo = params.get('redirect') || '/onboarding';
+
+  const redirectTo = useMemo(() => {
+    const fromState =
+      typeof (location.state as { from?: string } | null)?.from === 'string'
+        ? (location.state as { from: string }).from
+        : null;
+    return sanitizeAppPath(params.get('redirect') || fromState, '/onboarding');
+  }, [params, location.state]);
+
+  useEffect(() => {
+    savePostAuthRedirect(redirectTo);
+  }, [redirectTo]);
 
   useEffect(() => {
     if (isLoading || !user) return;
     if (!isEmailConfirmed(user)) {
-      navigate('/auth/verify-email', { replace: true });
+      navigate(
+        `/auth/verify-email?email=${encodeURIComponent(user.email || '')}&redirect=${encodeURIComponent(redirectTo)}`,
+        { replace: true }
+      );
       return;
     }
     navigate(redirectTo, { replace: true });
@@ -43,6 +60,7 @@ const AuthPage: React.FC = () => {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
+    savePostAuthRedirect(redirectTo);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -100,7 +118,8 @@ const AuthPage: React.FC = () => {
       return;
     }
 
-    savePendingAuth(email.trim(), password);
+    savePendingAuth(email.trim());
+    savePostAuthRedirect(redirectTo);
 
     if (data.session && isEmailConfirmed(data.user)) {
       toast.success('Welcome to RallyRank');
@@ -109,7 +128,9 @@ const AuthPage: React.FC = () => {
     }
 
     toast.success('Check your inbox to verify your email');
-    navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`);
+    navigate(
+      `/auth/verify-email?email=${encodeURIComponent(email.trim())}&redirect=${encodeURIComponent(redirectTo)}`
+    );
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -123,9 +144,12 @@ const AuthPage: React.FC = () => {
 
     if (error) {
       if (isEmailNotConfirmedError(error.message)) {
-        savePendingAuth(email.trim(), password);
+        savePendingAuth(email.trim());
+        savePostAuthRedirect(redirectTo);
         toast.message('Please verify your email to continue');
-        navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`);
+        navigate(
+          `/auth/verify-email?email=${encodeURIComponent(email.trim())}&redirect=${encodeURIComponent(redirectTo)}`
+        );
         return;
       }
       toast.error(error.message);

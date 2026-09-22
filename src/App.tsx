@@ -25,6 +25,7 @@ import RosterPage from '@/pages/app/RosterPage';
 import PlayerProfilePage from '@/pages/app/PlayerProfilePage';
 import LadderPage from '@/pages/app/LadderPage';
 import SettingsPage from '@/pages/app/SettingsPage';
+import ClaimPlayerPage from '@/pages/app/ClaimPlayerPage';
 import AccountPage from '@/pages/app/AccountPage';
 import NotFound from '@/pages/NotFound';
 
@@ -92,6 +93,7 @@ const App = () => (
             <Route path="/app/ladder" element={<AppLayout><LadderPage /></AppLayout>} />
             <Route path="/app/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
             <Route path="/app/account" element={<AppLayout><AccountPage /></AppLayout>} />
+            <Route path="/app/claim" element={<AppLayout><ClaimPlayerPage /></AppLayout>} />
 
             {/* Legacy redirects */}
             <Route path="/players" element={<Navigate to="/app/roster" replace />} />

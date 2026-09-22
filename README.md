@@ -35,6 +35,10 @@ Fair badminton club ladders — invite your club, balance sessions, log matches,
    - `20260321000000_clubs_tenancy_ratings.sql`
    - `20260321120000_profile_signup_fields.sql`
    - `20260321140000_invite_one_day_expiry.sql`
+   - `20260322100000_trust_sessions_identity.sql`
+   - `20260322120000_session_courts_ownership.sql`
+   - `20260322140000_guests_invites_archive.sql`
+   - `20260322160000_wave4_notes_k_profiles.sql`
 4. Configure Auth (required for signup flows):
 
 ### Confirm email

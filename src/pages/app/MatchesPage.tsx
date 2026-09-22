@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/ui/EmptyState';
 
 const MatchesPage: React.FC = () => {
-  const { club } = useClub();
+  const { club, season } = useClub();
 
   const { data: matches = [], isLoading } = useQuery({
-    queryKey: ['matches', club?.id],
+    queryKey: ['matches', club?.id, season?.id],
     enabled: !!club?.id,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('matches')
         .select(
           `
@@ -27,6 +27,8 @@ const MatchesPage: React.FC = () => {
         .eq('club_id', club!.id)
         .order('created_at', { ascending: false })
         .limit(50);
+      if (season?.id) q = q.eq('season_id', season.id);
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
@@ -37,7 +39,9 @@ const MatchesPage: React.FC = () => {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold text-ink">Matches</h1>
-          <p className="text-muted-foreground">Full club match history.</p>
+          <p className="text-muted-foreground">
+            {season?.name ? `${season.name} history` : 'Club match history'}
+          </p>
         </div>
         <Button asChild className="h-11">
           <Link to="/app/matches/new">Log match</Link>

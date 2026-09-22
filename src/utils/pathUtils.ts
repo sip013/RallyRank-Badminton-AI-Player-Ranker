@@ -14,7 +14,7 @@ export const getBaseUrl = (): string => {
     
     // Extract the repository name from the pathname
     // Format: /username/repository-name/
-    const match = pathname.match(/^\/([^\/]+)\/([^\/]+)/);
+    const match = pathname.match(/^\/([^/]+)\/([^/]+)/);
     
     if (match) {
       // Return the full base path including the repository name

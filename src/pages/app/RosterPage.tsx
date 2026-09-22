@@ -22,6 +22,7 @@ const RosterPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
+  const [asGuest, setAsGuest] = useState(false);
   const [open, setOpen] = useState(false);
   const [editPlayer, setEditPlayer] = useState<Player | null>(null);
 
@@ -33,7 +34,8 @@ const RosterPage: React.FC = () => {
         .from('players')
         .select('*')
         .eq('club_id', club!.id)
-        .order('rating', { ascending: false });
+        .is('archived_at', null)
+        .order('doubles_rating', { ascending: false });
       if (error) throw error;
       return data as Player[];
     },
@@ -43,52 +45,59 @@ const RosterPage: React.FC = () => {
     mutationFn: async () => {
       if (!club) throw new Error('No club');
       if (editPlayer) {
-        const { error } = await supabase
-          .from('players')
-          .update({
-            name: name.trim(),
-            age: age ? Number(age) : null,
-          })
-          .eq('id', editPlayer.id)
-          .eq('club_id', club.id);
+        const { error } = await supabase.rpc('update_player_profile', {
+          p_player_id: editPlayer.id,
+          p_name: name.trim(),
+          p_age: age ? Number(age) : null,
+        });
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('players').insert({
-          name: name.trim(),
-          age: age ? Number(age) : null,
-          rating: 1000,
-          matches_played: 0,
-          wins: 0,
-          club_id: club.id,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+        const { error } = await supabase.rpc('create_player', {
+          p_club_id: club.id,
+          p_name: name.trim(),
+          p_age: age ? Number(age) : null,
+          p_is_guest: asGuest,
         });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['players', club?.id] });
-      toast.success(editPlayer ? 'Player updated' : 'Player added');
+      toast.success(editPlayer ? 'Player updated' : asGuest ? 'Guest added' : 'Player added');
       setOpen(false);
       setName('');
       setAge('');
+      setAsGuest(false);
       setEditPlayer(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const deleteMutation = useMutation({
+  const archiveMutation = useMutation({
     mutationFn: async (id: string) => {
-      if (!confirm('Remove this player from the roster?')) return;
-      const { error } = await supabase
-        .from('players')
-        .delete()
-        .eq('id', id)
-        .eq('club_id', club!.id);
+      if (!confirm('Archive this player? They leave the active roster but match history stays.')) {
+        return false;
+      }
+      const { error } = await supabase.rpc('archive_player', { p_player_id: id });
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: (ok) => {
+      if (!ok) return;
+      queryClient.invalidateQueries({ queryKey: ['players', club?.id] });
+      toast.success('Player archived');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const promoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('promote_guest', { p_player_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['players', club?.id] });
-      toast.success('Player removed');
+      toast.success('Guest promoted to full roster');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -97,6 +106,7 @@ const RosterPage: React.FC = () => {
     setEditPlayer(null);
     setName('');
     setAge('');
+    setAsGuest(false);
     setOpen(true);
   };
 
@@ -104,6 +114,7 @@ const RosterPage: React.FC = () => {
     setEditPlayer(p);
     setName(p.name);
     setAge(p.age?.toString() || '');
+    setAsGuest(false);
     setOpen(true);
   };
 
@@ -151,6 +162,16 @@ const RosterPage: React.FC = () => {
                   className="h-11"
                 />
               </div>
+              {!editPlayer && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={asGuest}
+                    onChange={(e) => setAsGuest(e.target.checked)}
+                  />
+                  Guest only (hidden from public ladder until promoted)
+                </label>
+              )}
               <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? 'Saving…' : 'Save'}
               </Button>
@@ -172,8 +193,9 @@ const RosterPage: React.FC = () => {
             <thead className="border-b border-border bg-muted/40 text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Player</th>
-                <th className="px-4 py-3 font-medium">Rating</th>
-                <th className="hidden px-4 py-3 font-medium sm:table-cell">W–L</th>
+                <th className="px-4 py-3 font-medium">Doubles</th>
+                <th className="hidden px-4 py-3 font-medium sm:table-cell">Singles</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">W–L (D)</th>
                 <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
@@ -184,13 +206,35 @@ const RosterPage: React.FC = () => {
                     <Link to={`/app/roster/${p.id}`} className="font-medium hover:text-court">
                       {p.name}
                     </Link>
-                    <p className="text-xs text-muted-foreground">Elo ladder</p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.is_guest ? 'Guest' : 'Elo ladder'}
+                      {p.user_id ? ' · linked' : ''}
+                      <span className="sm:hidden">
+                        {' '}
+                        · S {p.rating}
+                      </span>
+                    </p>
                   </td>
-                  <td className="px-4 py-3 font-display font-bold tabular-nums">{p.rating}</td>
-                  <td className="hidden px-4 py-3 tabular-nums sm:table-cell">
-                    {p.wins}–{Math.max(0, p.matches_played - p.wins)}
+                  <td className="px-4 py-3 font-display font-bold tabular-nums">
+                    {p.doubles_rating}
+                  </td>
+                  <td className="hidden px-4 py-3 tabular-nums text-muted-foreground sm:table-cell">
+                    {p.rating}
+                  </td>
+                  <td className="hidden px-4 py-3 tabular-nums md:table-cell">
+                    {p.doubles_wins}–{Math.max(0, p.doubles_matches_played - p.doubles_wins)}
                   </td>
                   <td className="px-4 py-3 text-right">
+                    {p.is_guest && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => promoteMutation.mutate(p.id)}
+                        disabled={promoteMutation.isPending}
+                      >
+                        Promote
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
                       Edit
                     </Button>
@@ -198,9 +242,10 @@ const RosterPage: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       className="text-destructive"
-                      onClick={() => deleteMutation.mutate(p.id)}
+                      onClick={() => archiveMutation.mutate(p.id)}
+                      disabled={archiveMutation.isPending}
                     >
-                      Remove
+                      Archive
                     </Button>
                   </td>
                 </tr>

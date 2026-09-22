@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { useClub } from '@/context/ClubContext';
 import { Button } from '@/components/ui/button';
+import { savePostAuthRedirect } from '@/lib/authHelpers';
 
 const JoinClubPage: React.FC = () => {
   const { code } = useParams<{ code: string }>();
@@ -11,10 +12,14 @@ const JoinClubPage: React.FC = () => {
   const { joinClub } = useClub();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const autoJoined = useRef(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate(`/auth?mode=signup&redirect=/join/${code}`);
+    if (authLoading || !code) return;
+    if (!user) {
+      const redirect = `/join/${code}`;
+      savePostAuthRedirect(redirect);
+      navigate(`/auth?mode=signup&redirect=${encodeURIComponent(redirect)}`);
     }
   }, [authLoading, user, navigate, code]);
 
@@ -24,13 +29,27 @@ const JoinClubPage: React.FC = () => {
     try {
       await joinClub(code);
       toast.success('Welcome to the club');
-      navigate('/app');
+      navigate('/app/claim');
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Could not join');
     } finally {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (authLoading || !user || !code || autoJoined.current) return;
+    const guardKey = `rallyrank.autoJoined.${code}`;
+    try {
+      if (sessionStorage.getItem(guardKey)) return;
+      sessionStorage.setItem(guardKey, '1');
+    } catch {
+      /* ignore */
+    }
+    autoJoined.current = true;
+    void handleJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, code]);
 
   return (
     <div className="court-lines flex min-h-screen items-center justify-center px-4">

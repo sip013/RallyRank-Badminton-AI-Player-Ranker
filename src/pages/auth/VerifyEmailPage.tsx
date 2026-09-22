@@ -9,10 +9,14 @@ import BrandMark from '@/components/BrandMark';
 import {
   authCallbackUrl,
   clearPendingAuth,
+  consumePostAuthRedirect,
   isEmailConfirmed,
   isEmailNotConfirmedError,
   readPendingAuth,
+  readPostAuthRedirect,
+  sanitizeAppPath,
   savePendingAuth,
+  savePostAuthRedirect,
   subscribeAuthVerified,
 } from '@/lib/authHelpers';
 
@@ -21,17 +25,33 @@ const VerifyEmailPage: React.FC = () => {
   const [params] = useSearchParams();
   const pending = useMemo(() => readPendingAuth(), []);
   const [email, setEmail] = useState(params.get('email') || pending?.email || '');
-  const [password, setPassword] = useState(pending?.password || '');
+  const [password, setPassword] = useState('');
   const [status, setStatus] = useState('Waiting for the confirmation link…');
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(false);
   const finishing = useRef(false);
   const checkingRef = useRef(false);
 
+  const redirectHint = useMemo(
+    () => sanitizeAppPath(params.get('redirect') || readPostAuthRedirect(), ''),
+    [params]
+  );
+
+  useEffect(() => {
+    if (redirectHint) savePostAuthRedirect(redirectHint);
+  }, [redirectHint]);
+
   const goNext = useCallback(async () => {
     if (finishing.current) return;
     finishing.current = true;
     clearPendingAuth();
+
+    const saved = readPostAuthRedirect();
+    if (saved) {
+      navigate(consumePostAuthRedirect(saved), { replace: true });
+      return;
+    }
+
     const { data } = await supabase.from('memberships').select('id').limit(1);
     navigate(data && data.length > 0 ? '/app' : '/onboarding', { replace: true });
   }, [navigate]);
@@ -46,7 +66,6 @@ const VerifyEmailPage: React.FC = () => {
       return true;
     }
 
-    // Session may exist from signup but still unconfirmed — refresh user from server
     if (sessionData.session?.user) {
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user && isEmailConfirmed(userData.user)) {
@@ -62,17 +81,18 @@ const VerifyEmailPage: React.FC = () => {
   const trySignInOnce = useCallback(async () => {
     if (finishing.current || checkingRef.current) return;
 
-    const creds = readPendingAuth();
-    const tryEmail = creds?.email || email;
-    const tryPassword = creds?.password || password;
-    if (!tryEmail || !tryPassword) return;
+    const tryEmail = readPendingAuth()?.email || email;
+    if (!tryEmail || !password) {
+      setStatus('Enter your password to continue after confirming.');
+      return;
+    }
 
     checkingRef.current = true;
     setChecking(true);
     setStatus('Checking verification…');
     const { error } = await supabase.auth.signInWithPassword({
       email: tryEmail,
-      password: tryPassword,
+      password,
     });
     checkingRef.current = false;
     setChecking(false);
@@ -101,7 +121,6 @@ const VerifyEmailPage: React.FC = () => {
       setStatus('Confirmation received — signing you in…');
       const entered = await tryEnterIfVerified();
       if (!entered && alive) {
-        // Ping arrived from another tab that already has the session; retry briefly
         await trySignInOnce();
       }
     };
@@ -150,7 +169,7 @@ const VerifyEmailPage: React.FC = () => {
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
-    savePendingAuth(email, password);
+    savePendingAuth(email);
     await trySignInOnce();
   };
 
@@ -170,8 +189,6 @@ const VerifyEmailPage: React.FC = () => {
     else toast.success('Verification email sent');
   };
 
-  const hasCreds = Boolean(readPendingAuth()?.password || password);
-
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside
@@ -188,7 +205,7 @@ const VerifyEmailPage: React.FC = () => {
           <h1 className="font-display text-3xl font-bold">Check your inbox</h1>
           <p className="mt-3 text-white/85">
             Open the confirmation link. This page updates when verification
-            completes — no repeated checks.
+            completes — no password is stored in the browser while you wait.
           </p>
         </div>
         <span />
@@ -209,46 +226,37 @@ const VerifyEmailPage: React.FC = () => {
             Listening for confirmation
           </div>
 
-          {!hasCreds && (
-            <form onSubmit={handleContinue} className="mt-6 space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="verify-email">Email</Label>
-                <Input
-                  id="verify-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-11"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="verify-password">Password</Label>
-                <Input
-                  id="verify-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-11"
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={checking}>
-                {checking ? 'Checking…' : "I've confirmed — continue"}
-              </Button>
-            </form>
-          )}
-
-          {hasCreds && (
-            <Button
-              type="button"
-              className="mt-6 w-full"
-              disabled={checking}
-              onClick={() => void trySignInOnce()}
-            >
+          <form onSubmit={handleContinue} className="mt-6 space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="verify-email">Email</Label>
+              <Input
+                id="verify-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-11"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="verify-password">Password</Label>
+              <Input
+                id="verify-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11"
+                autoComplete="current-password"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Re-enter your password only when continuing manually — it is not saved here.
+              </p>
+            </div>
+            <Button type="submit" className="w-full" disabled={checking}>
               {checking ? 'Checking…' : "I've confirmed — continue"}
             </Button>
-          )}
+          </form>
 
           <div className="mt-6 flex flex-col gap-2">
             <Button

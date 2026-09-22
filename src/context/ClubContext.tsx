@@ -12,6 +12,7 @@ type ClubContextType = {
   isLoading: boolean;
   setActiveClubId: (id: string) => void;
   refreshClubs: () => Promise<void>;
+  refreshSeason: () => Promise<void>;
   createClub: (name: string) => Promise<Club>;
   joinClub: (code: string) => Promise<Club>;
 };
@@ -90,20 +91,24 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshClubs();
   }, [refreshClubs]);
 
-  useEffect(() => {
+  const refreshSeason = useCallback(async () => {
     if (!activeClubId) {
       setSeason(null);
       return;
     }
 
-    supabase
+    const { data } = await supabase
       .from('seasons')
       .select('*')
       .eq('club_id', activeClubId)
       .eq('is_active', true)
-      .maybeSingle()
-      .then(({ data }) => setSeason((data as Season) || null));
+      .maybeSingle();
+    setSeason((data as Season) || null);
   }, [activeClubId]);
+
+  useEffect(() => {
+    void refreshSeason();
+  }, [refreshSeason]);
 
   const setActiveClubId = (id: string) => {
     setActiveClubIdState(id);
@@ -148,6 +153,7 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     setActiveClubId,
     refreshClubs,
+    refreshSeason,
     createClub,
     joinClub,
   };

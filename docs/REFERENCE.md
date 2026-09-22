@@ -1,6 +1,6 @@
 # RallyRank — Product Reference
 
-Branch: [`product-revamp`](https://github.com/sip013/RallyRank-Badminton-AI-Player-Ranker/tree/product-revamp)  
+Default branch: [`main`](https://github.com/sip013/RallyRank-Badminton-AI-Player-Ranker/tree/main)  
 Stack: Vite · React · TypeScript · Tailwind · shadcn/ui · Supabase (Auth, Postgres, RLS, RPCs)
 
 This document is the canonical reference for architecture, routes, data model, auth, and operator setup for the club-first RallyRank product.
@@ -144,20 +144,29 @@ Stored via `raw_user_meta_data` → `handle_new_user` trigger → `profiles`:
 | `memberships` | user ↔ club + role |
 | `invites` | One-time join codes |
 | `seasons` | Active season flag |
-| `players` | Club roster + Elo stats |
+| `players` | Club roster + singles Elo (`rating`) + doubles Elo (`doubles_rating`) (+ optional `user_id` link) |
 | `matches` | Logged results |
-| `rating_events` | Per-player rating deltas |
-| Rivalry / synergy stats tables | Ladder insights |
+| `match_history` | Per-player rating before/after + win flag + `rating_format` (`singles`/`doubles`) |
+| `pair_ratings` | Partnership Elo for doubles pairs |
+| `pair_match_history` | Pair rating deltas (for undo) |
+| `club_sessions` | Open/closed club-night attendance + teams |
+
+Rivalries & doubles synergy on the Ladder page are **client-aggregated** from **season-scoped** `matches`.
 
 ### Important RPCs
 
 | RPC | Purpose |
 |-----|---------|
 | `create_club` | Bootstrap club + owner membership + Season 1 |
-| `join_club_with_code` | Redeem invite |
+| `join_club_with_code` | Redeem invite (keeps existing role on re-join) |
 | `create_invite` | New code; **expires in 1 day** |
-| `log_match` | Insert match + Elo (K=32) + events |
+| `log_match` | Insert match + format-aware Elo (singles→`rating`, doubles→`doubles_rating` + pair Elo); K=32 / provisional 40 |
+| `undo_match` | Revert Elo for the club’s **most recent** match |
+| `leave_club` / `remove_member` / `update_member_role` | Membership lifecycle |
 | `start_season` | New season; ratings → 1000 |
+| `rotate_share_token` | Invalidate + reissue public ladder link |
+| `link_player_to_user` / `unlink_player` | Roster ↔ account identity |
+| `get_or_open_session` / `save_session_state` / `close_session` | Tonight session persistence |
 | `get_public_ladder` | Public ladder by `share_token` |
 
 ### Migrations (apply in order)
@@ -165,8 +174,13 @@ Stored via `raw_user_meta_data` → `handle_new_user` trigger → `profiles`:
 1. `supabase/migrations/20260321000000_clubs_tenancy_ratings.sql` — schema, RLS, RPCs  
 2. `supabase/migrations/20260321120000_profile_signup_fields.sql` — name/phone on profiles  
 3. `supabase/migrations/20260321140000_invite_one_day_expiry.sql` — invite TTL = 1 day  
+4. `supabase/migrations/20260322100000_trust_sessions_identity.sql` — trust, undo, sessions, identity  
+5. `supabase/migrations/20260322120000_session_courts_ownership.sql` — session_id, courts, transfer ownership  
+6. `supabase/migrations/20260322140000_guests_invites_archive.sql` — guests, archive, revoke, rename  
+7. `supabase/migrations/20260322160000_wave4_notes_k_profiles.sql` — notes/dispute, provisional K, profiles RLS, soft season, templates  
+8. `supabase/migrations/20260322180000_doubles_pair_elo.sql` — singles vs doubles Elo + pair partnership Elo  
 
----
+See also [`docs/ROADMAP.md`](./ROADMAP.md) for the full product backlog.
 
 ## 6. Frontend architecture
 
@@ -197,7 +211,14 @@ src/
 
 ### Session balancer
 
-Client-side snake draft by rating (`src/lib/teamBalance.ts`). Attendance persisted in `localStorage` per club.
+Client-side snake draft by **doubles** Elo (`src/lib/teamBalance.ts` → `playerBalanceRating`). Attendance persisted server-side via `club_sessions`.
+
+### Ratings model (wave 5)
+
+- **Singles** matches update `players.rating` (+ singles match counters)
+- **Doubles** matches update `players.doubles_rating` (+ doubles counters) and `pair_ratings` for each partnership
+- Ladder defaults to doubles; session balancer uses doubles Elo
+- Hard season reset zeroes both formats and pair ratings; soft keeps ratings, zeroes counters
 
 ### Match scores
 
@@ -207,14 +228,39 @@ Typable score fields (0–30) with ± steppers; ties rejected.
 
 ## 7. Security / RLS (operator notes)
 
-- All club data scoped by membership via RLS helpers (`is_club_member`, `club_role`)
-- `profiles` readable broadly for member name resolution; users update own row
-- Invites selectable by club admins/owners; redemption via security-definer RPC
-- Public ladder only via `get_public_ladder(share_token)` — no open write path
+- Club data scoped by membership via `is_club_member` / `club_role`
+- **Membership inserts** only via security-definer RPCs (`create_club`, `join_club_with_code`) — no client self-join
+- Leave / kick / role change via RPCs + policies
+- Invites redeem via `join_club_with_code`
+- Public ladder only via `get_public_ladder(share_token)`; rotate with `rotate_share_token`
+- Match corrections via `undo_match` (not raw delete)
+- Removed: `supabase/functions/update-ratings/` (never deployed; dead code deleted)
+- App calls `log_match` RPC directly; edge `log-match` is optional
 
 ---
 
-## 8. Local development
+## 8. Known product gaps & recommended next work
+
+Shipped in trust / Tonight / identity pass: invite redirect, membership lock, undo, distinct players, season-scoped history, session persistence + match prefill, account fields, share rotate, player↔user link, **close-session summary with rating movers**.
+
+### Still open (later)
+
+1. Claim-on-join / guest players / invite revoke  
+2. Expand SQL smoke; CI (typecheck + lint + tests)  
+3. Narrow `profiles_select` to club-mates if privacy becomes an issue  
+4. Offline match queue / brackets / billing  
+5. Provisional K, CSV export, match notes  
+
+Legacy page trees removed; Vitest covers `teamBalance` + `sessionSummary` (`npm test`).
+
+### Intentionally deferred
+
+- Hosting / CDN polish
+- Custom FastAPI JWT auth (Supabase Auth is the system of record)
+
+---
+
+## 9. Local development
 
 ```bash
 npm install
@@ -235,7 +281,7 @@ Scripts: `npm run build` · `npm run lint` · `npm run typecheck`
 
 ---
 
-## 9. Deploy checklist
+## 10. Deploy checklist
 
 1. Host static build (`npm run build` → `dist`)  
 2. Set `VITE_SUPABASE_*` (and `VITE_BASE_URL` if subpath)  
@@ -246,11 +292,12 @@ Scripts: `npm run build` · `npm run lint` · `npm run typecheck`
 
 ---
 
-## 10. Related docs
+## 11. Related docs
 
 - Root [`README.md`](../README.md) — quick setup  
+- [`ROADMAP.md`](./ROADMAP.md) — full product backlog  
 - Migrations under `supabase/migrations/`  
-- Repo branch: [product-revamp](https://github.com/sip013/RallyRank-Badminton-AI-Player-Ranker/tree/product-revamp)
+- Repo: [main](https://github.com/sip013/RallyRank-Badminton-AI-Player-Ranker/tree/main)
 
 ---
 

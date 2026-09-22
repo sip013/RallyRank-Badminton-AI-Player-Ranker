@@ -51,6 +51,9 @@ serve(async (req) => {
       team1_score,
       team2_score,
       played_at,
+      session_id = null,
+      session_note = null,
+      is_disputed = false,
     } = body;
 
     const { data, error } = await supabase.rpc("log_match", {
@@ -62,6 +65,9 @@ serve(async (req) => {
       p_team1_score: team1_score,
       p_team2_score: team2_score,
       p_played_at: played_at || new Date().toISOString(),
+      p_session_id: session_id,
+      p_session_note: session_note,
+      p_is_disputed: Boolean(is_disputed),
     });
 
     if (error) {

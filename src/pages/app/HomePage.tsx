@@ -19,14 +19,15 @@ const HomePage: React.FC = () => {
         .from('players')
         .select('*')
         .eq('club_id', club!.id)
-        .order('rating', { ascending: false });
+        .is('archived_at', null)
+        .order('doubles_rating', { ascending: false });
       if (error) throw error;
       return data as Player[];
     },
   });
 
   const { data: recentMatches = [] } = useQuery({
-    queryKey: ['matches-recent', club?.id],
+    queryKey: ['matches', 'recent', club?.id],
     enabled: !!club?.id,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -47,8 +48,8 @@ const HomePage: React.FC = () => {
   });
 
   const movers = [...players]
-    .filter((p) => p.matches_played > 0)
-    .sort((a, b) => (b.streak_count || 0) - (a.streak_count || 0))
+    .filter((p) => p.doubles_matches_played > 0)
+    .sort((a, b) => (b.doubles_streak_count || 0) - (a.doubles_streak_count || 0))
     .slice(0, 3);
 
   if (!players.length) {
@@ -108,7 +109,12 @@ const HomePage: React.FC = () => {
                   {p.name}
                 </Link>
               </div>
-              <span className="font-display font-bold tabular-nums">{p.rating}</span>
+              <span className="flex items-baseline gap-2 tabular-nums">
+                <span className="font-display font-bold">{p.doubles_rating}</span>
+                <span className="text-xs text-muted-foreground" title="Singles Elo">
+                  {p.rating}
+                </span>
+              </span>
             </li>
           ))}
         </ul>
@@ -152,7 +158,7 @@ const HomePage: React.FC = () => {
                     {p.name}
                   </Link>
                   <span className="rounded-full bg-court/10 px-2 py-0.5 text-xs font-semibold text-court">
-                    {p.streak_count} win streak
+                    {p.doubles_streak_count} win streak
                   </span>
                 </li>
               ))}
