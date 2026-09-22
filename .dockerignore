@@ -1,0 +1,15 @@
+# Keep build context small and avoid copying local caches into the image
+node_modules
+dist
+dist-ssr
+.git
+.github
+.cursor
+.env
+.env.*
+!.env.example
+*.log
+_remediation_extract
+remediation-system.zip
+coverage
+.DS_Store

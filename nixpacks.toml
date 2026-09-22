@@ -1,11 +1,17 @@
 # Force Node — without this, Nixpacks detects Deno from supabase/functions/
 providers = ["node"]
 
+[variables]
+# Vite lives in devDependencies; Railway often sets production=true during install
+NPM_CONFIG_PRODUCTION = "false"
+NIXPACKS_NODE_VERSION = "20"
+
 [phases.setup]
 nixPkgs = ["nodejs_20", "npm-10_x"]
 
+# Single install only — do not also run npm ci in railway.toml buildCommand
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]

@@ -1,10 +1,11 @@
 # Railway: static Vite SPA
 # Variables (build-time): VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, VITE_BASE_URL=/
-# nixpacks.toml forces Node (avoids Deno detection from supabase/functions).
+#
+# Install + build are owned by nixpacks.toml only.
+# Do not set buildCommand to "npm ci && …" — that double-runs npm ci and causes EBUSY.
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
 nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
